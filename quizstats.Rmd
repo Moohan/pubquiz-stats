@@ -1,0 +1,66 @@
+---
+title: "Pub Quiz Stats"
+runtime: shiny
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+if (!require(tidyverse)) {
+  install.packages("tidyverse")
+  library(tidyverse)
+}
+if (!require(tidytext)) {
+  install.packages("tidytext")
+  library(tidytext)
+}
+if (!require(ggplot2)) {
+  install.packages("ggplot2")
+  library(ggplot2)
+}
+if (!require(googlesheets4)) {
+  install.packages("googlesheets4")
+  library(googlesheets4)
+}
+```
+
+```{r data_import, include=FALSE}
+sheet_url <- "https://docs.google.com/spreadsheets/d/12yUhkqq5ajM_uq7vLytH9cBceCCDFC0MEJluVX_aBdA/edit?usp=sharing"
+
+gs4_deauth()
+quiz_data <- 
+  read_sheet(sheet_url) %>% 
+  janitor::clean_names()
+```
+
+```{r data_clean, include=FALSE}
+position_order <- c("winning_team", "second_place", "third_place",  "fourth_place")
+position_label <- c("1st", "2nd", "3rd", "4th")
+
+clean_data <- quiz_data %>% 
+  pivot_longer(cols = c(winning_team, second_place, third_place, fourth_place),
+               names_to = "position",
+               values_to = "team_members") %>% 
+  unnest_tokens(output = "person",
+                input = "team_members") %>% 
+  anti_join(get_stopwords(), by = c("person" = "word")) %>% 
+  mutate(person = case_when(person == "cami" ~ "camille",
+                            TRUE ~ person)) %>% 
+  mutate(position = ordered(position, position_order, position_label),
+         person = str_to_sentence(person))
+```
+
+```{r plot_n}
+clean_data %>% 
+  drop_na() %>% 
+  count(person, position) %>%
+  group_by(person) %>% 
+  mutate(quizzes = sum(n)) %>% 
+  ggplot(aes(x = reorder(person, -quizzes), y = n, fill = position)) +
+  geom_col() +
+  scale_fill_brewer() +
+  theme_minimal()
+```
+
+
