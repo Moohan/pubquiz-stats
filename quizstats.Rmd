@@ -1,15 +1,24 @@
 ---
 title: "Pub Quiz Stats"
-runtime: shiny
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10
+)
+
 
 if (!require(tidyverse)) {
   install.packages("tidyverse")
   library(tidyverse)
+}
+if (!require(janitor)) {
+  install.packages("janitor")
+  library(janitor)
 }
 if (!require(tidytext)) {
   install.packages("tidytext")
@@ -18,6 +27,10 @@ if (!require(tidytext)) {
 if (!require(ggplot2)) {
   install.packages("ggplot2")
   library(ggplot2)
+}
+if (!require(scales)) {
+  install.packages("scales")
+  library(scales)
 }
 if (!require(googlesheets4)) {
   install.packages("googlesheets4")
@@ -28,39 +41,132 @@ if (!require(googlesheets4)) {
 ```{r data_import, include=FALSE}
 sheet_url <- "https://docs.google.com/spreadsheets/d/12yUhkqq5ajM_uq7vLytH9cBceCCDFC0MEJluVX_aBdA/edit?usp=sharing"
 
+# Sheet doesn't need auth as it has link editing enabled
 gs4_deauth()
-quiz_data <- 
-  read_sheet(sheet_url) %>% 
-  janitor::clean_names()
+
+# Read the sheet and clean up the variable names
+quiz_data <-
+  read_sheet(sheet_url) %>%
+  clean_names()
 ```
 
 ```{r data_clean, include=FALSE}
-position_order <- c("winning_team", "second_place", "third_place",  "fourth_place")
+# Set some vars for use with formatting the positions
+position_order <- c("winning_team", "second_place", "third_place", "fourth_place")
 position_label <- c("1st", "2nd", "3rd", "4th")
 
-clean_data <- quiz_data %>% 
-  pivot_longer(cols = c(winning_team, second_place, third_place, fourth_place),
-               names_to = "position",
-               values_to = "team_members") %>% 
-  unnest_tokens(output = "person",
-                input = "team_members") %>% 
-  anti_join(get_stopwords(), by = c("person" = "word")) %>% 
-  mutate(person = case_when(person == "cami" ~ "camille",
-                            TRUE ~ person)) %>% 
-  mutate(position = ordered(position, position_order, position_label),
-         person = str_to_sentence(person))
+clean_data <- quiz_data %>%
+  rename(quiz_date = hosted_quiz) %>%
+  mutate(quiz_date = as.Date(quiz_date)) %>% 
+  # Restructure to make it easier to work with
+  pivot_longer(
+    cols = c(winning_team, second_place, third_place, fourth_place),
+    names_to = "position",
+    values_to = "team_members"
+  ) %>%
+  # Drop missing data
+  drop_na() %>%
+  # Resturucture and tidy up the text
+  unnest_tokens(
+    output = "person",
+    input = "team_members"
+  ) %>%
+  anti_join(get_stopwords(), by = c("person" = "word")) %>%
+  # Fixes for names
+  mutate(
+    person = case_when(
+      person == "cami" ~ "camille",
+      TRUE ~ person
+    ),
+    # Re-capitalise
+    person = str_to_sentence(person)
+  ) %>%
+  # Create a nicely ordered factor
+  mutate(position = ordered(position, position_order, position_label)) %>%
+  # Calculate scaled scores
+  group_by(quiz_date, position) %>%
+  mutate(team_size = n()) %>%
+  group_by(quiz_date) %>%
+  # Score scaled according to the number of teams
+  mutate(scaled_score = fct_rev(position) %>%
+    as.integer() %>%
+    scale(center = 0)) %>%
+  # Scaled score inversely weighted by the size of the team
+  mutate(weighted_scaled_score = scaled_score * (1 - team_size / n())) %>%
+  # Count quizzes per person
+  group_by(person) %>%
+  mutate(n_quizzes = n()) %>%
+  # Also a cummulative mean of the weighted score
+  mutate(score_cummean = cummean(weighted_scaled_score)) %>%
+  left_join(
+    summarise(., n_quizzes = max(n_quizzes)) %>%
+      mutate(n_quizzes_rank = rank(-n_quizzes, ties.method = "min"))
+  ) %>%
+  left_join(
+    filter(., n_quizzes > 1) %>%
+      summarise(overall_rank = mean(weighted_scaled_score)) %>%
+      mutate(overall_rank = rank(-overall_rank, ties.method = "max"))
+  ) %>%
+  ungroup()
 ```
 
-```{r plot_n}
-clean_data %>% 
-  drop_na() %>% 
-  count(person, position) %>%
-  group_by(person) %>% 
-  mutate(quizzes = sum(n)) %>% 
-  ggplot(aes(x = reorder(person, -quizzes), y = n, fill = position)) +
-  geom_col() +
-  scale_fill_brewer() +
+
+```{r bar_plot_n}
+# Plot of People by number of times they have placed.
+clean_data %>%
+  ggplot(aes(x = reorder(person, overall_rank), fill = position)) +
+  geom_bar() +
+  xlab("Person") +
+  ylab("Number of quizes") +
+  ggtitle(label = "Count of positions per person",
+          subtitle = "Sorted by overall rank") +
+  scale_fill_brewer("Team Position", 
+                    type = "seq",
+                    palette = "OrRd",
+                    direction = -1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45))
+```
+
+```{r plot_formatting}
+
+colour_scale <- scale_color_brewer("Person",
+    type = "qual",
+    palette = "Set3"
+  )
+
+time_trend_x <- 
+  scale_x_date(breaks=breaks_width("week"),
+               labels=date_format("%d %b"))
+```
+
+```{r scaled_score_over_time_n_quizzes}
+# Scaled score over time
+clean_data %>%
+  filter(n_quizzes_rank <= 10) %>%
+  ggplot(aes(x = quiz_date, y = score_cummean, colour = reorder(person, overall_rank))) +
+  geom_smooth(se = FALSE, size = 0.5) +
+  xlab("Date of quiz") +
+  ylab("Weighted score") +
+  ggtitle(label = "Weighted score over time",
+          subtitle = "Filtered to the 10 people who have done the most quizzes") +
+  colour_scale +
+  time_trend_x +
   theme_minimal()
 ```
 
 
+```{r scaled_score_over_time_rank}
+# Scaled score over time
+clean_data %>%
+  filter(overall_rank <= 10) %>%
+  ggplot(aes(x = quiz_date, y = score_cummean, colour = reorder(person, overall_rank))) +
+  geom_smooth(se = FALSE, size = 0.5) +
+  xlab("Date of quiz") +
+  ylab("Weighted score") +
+  ggtitle(label = "Weighted score over time",
+          subtitle = "Filtered to the top 10 overall ranked people") +
+  colour_scale +
+  time_trend_x +
+  theme_minimal()
+```
