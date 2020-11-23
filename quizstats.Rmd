@@ -57,7 +57,7 @@ position_label <- c("1st", "2nd", "3rd", "4th")
 
 clean_data <- quiz_data %>%
   rename(quiz_date = hosted_quiz) %>%
-  mutate(quiz_date = as.Date(quiz_date)) %>% 
+  mutate(quiz_date = as.Date(quiz_date)) %>%
   # Restructure to make it easier to work with
   pivot_longer(
     cols = c(winning_team, second_place, third_place, fourth_place),
@@ -118,12 +118,15 @@ clean_data %>%
   geom_bar() +
   xlab("Person") +
   ylab("Number of quizes") +
-  ggtitle(label = "Count of positions per person",
-          subtitle = "Sorted by overall rank") +
-  scale_fill_brewer("Team Position", 
-                    type = "seq",
-                    palette = "OrRd",
-                    direction = -1) +
+  ggtitle(
+    label = "Count of positions per person",
+    subtitle = "Sorted by overall rank"
+  ) +
+  scale_fill_brewer("Team Position",
+    type = "seq",
+    palette = "OrRd",
+    direction = -1
+  ) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45))
 ```
@@ -131,9 +134,9 @@ clean_data %>%
 ```{r plot_formatting}
 
 colour_scale <- scale_color_brewer("Person",
-    type = "qual",
-    palette = "Set3"
-  )
+  type = "qual",
+  palette = "Set3"
+)
 
 time_trend_x <-
   scale_x_date(
@@ -150,8 +153,10 @@ clean_data %>%
   geom_smooth(se = FALSE, size = 0.5) +
   xlab("Date of quiz") +
   ylab("Weighted score") +
-  ggtitle(label = "Weighted score over time",
-          subtitle = "Filtered to the 10 people who have done the most quizzes") +
+  ggtitle(
+    label = "Weighted score over time",
+    subtitle = "Filtered to the 10 people who have done the most quizzes"
+  ) +
   colour_scale +
   time_trend_x +
   theme_minimal()
@@ -166,8 +171,10 @@ clean_data %>%
   geom_smooth(se = FALSE, size = 0.5) +
   xlab("Date of quiz") +
   ylab("Weighted score") +
-  ggtitle(label = "Weighted score over time",
-          subtitle = "Filtered to the top 10 overall ranked people") +
+  ggtitle(
+    label = "Weighted score over time",
+    subtitle = "Filtered to the top 10 overall ranked people"
+  ) +
   colour_scale +
   time_trend_x +
   theme_minimal()
