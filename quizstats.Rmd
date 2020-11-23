@@ -135,9 +135,11 @@ colour_scale <- scale_color_brewer("Person",
     palette = "Set3"
   )
 
-time_trend_x <- 
-  scale_x_date(breaks=breaks_width("week"),
-               labels=date_format("%d %b"))
+time_trend_x <-
+  scale_x_date(
+    breaks = breaks_width("week", offset = -1),
+    labels = date_format("%d %b")
+  )
 ```
 
 ```{r scaled_score_over_time_n_quizzes}
