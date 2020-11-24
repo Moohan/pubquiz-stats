@@ -110,6 +110,25 @@ clean_data <- quiz_data %>%
   ungroup()
 ```
 
+```{r summary_table}
+clean_data %>%
+  group_by(person) %>%
+  summarise(across(c(overall_rank, n_quizzes, score_cummean), last)) %>%
+  arrange(overall_rank) %>%
+  rename(
+    Name = person,
+    "Current rank" = overall_rank,
+    "Number of quizzes" = n_quizzes,
+    "Mean score" = score_cummean
+  ) %>%
+  gt() %>%
+  tab_footnote(
+    footnote = "Score is the score per quiz (1st, 2nd etc.), scaled and then weighted by the team size",
+    locations = cells_column_labels(
+      columns = vars("Mean score")
+    )
+  )
+```
 
 ```{r bar_plot_n}
 # Plot of People by number of times they have placed.
