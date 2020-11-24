@@ -103,7 +103,7 @@ clean_data <- quiz_data %>%
       mutate(n_quizzes_rank = rank(-n_quizzes, ties.method = "min"))
   ) %>%
   left_join(
-    filter(., n_quizzes > 1) %>%
+    filter(., n_quizzes > 2) %>%
       summarise(overall_rank = mean(weighted_scaled_score)) %>%
       mutate(overall_rank = rank(-overall_rank, ties.method = "max"))
   ) %>%
