@@ -20,6 +20,10 @@ if (!require(janitor)) {
   install.packages("janitor")
   library(janitor)
 }
+if (!require(lubridate)) {
+  install.packages("lubridate")
+  library(lubridate)
+}
 if (!require(tidytext)) {
   install.packages("tidytext")
   library(tidytext)
@@ -31,6 +35,10 @@ if (!require(ggplot2)) {
 if (!require(scales)) {
   install.packages("scales")
   library(scales)
+}
+if (!require(gt)) {
+  install.packages("gt")
+  library(gt)
 }
 if (!require(googlesheets4)) {
   install.packages("googlesheets4")
@@ -108,6 +116,25 @@ clean_data <- quiz_data %>%
       mutate(overall_rank = rank(-overall_rank, ties.method = "max"))
   ) %>%
   ungroup()
+```
+
+```{r host_table}
+quiz_data %>%
+  select(quizmasters, hosted_quiz, winning_team) %>%
+  drop_na() %>%
+  group_by(quizmasters) %>%
+  summarise(
+    n_hosted = n(),
+    last_hosted = time_length(interval(max(hosted_quiz), today()), "weeks")
+  ) %>% 
+  arrange(-n_hosted, last_hosted) %>% 
+  mutate(last_hosted = if_else(last_hosted < 1,
+                               str_glue("{ceiling(last_hosted)} week ago"),
+                               str_glue("{ceiling(last_hosted)} weeks ago"))) %>% 
+  rename("Quiz Hosts" = quizmasters,
+         "Times hosted" = n_hosted,
+         "Last hosted" = last_hosted) %>% 
+  gt()
 ```
 
 ```{r summary_table}
