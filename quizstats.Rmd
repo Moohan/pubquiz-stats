@@ -40,6 +40,10 @@ if (!require(gt)) {
   install.packages("gt")
   library(gt)
 }
+if (!require(corrr)) {
+  install.packages("corrr")
+  library(corrr)
+}
 if (!require(googlesheets4)) {
   install.packages("googlesheets4")
   library(googlesheets4)
@@ -62,6 +66,8 @@ quiz_data <-
 # Set some vars for use with formatting the positions
 position_order <- c("winning_team", "second_place", "third_place", "fourth_place")
 position_label <- c("1st", "2nd", "3rd", "4th")
+
+min_quizzes <- 5
 
 clean_data <- quiz_data %>%
   rename(quiz_date = hosted_quiz) %>%
@@ -111,7 +117,7 @@ clean_data <- quiz_data %>%
       mutate(n_quizzes_rank = rank(-n_quizzes, ties.method = "min"))
   ) %>%
   left_join(
-    filter(., n_quizzes > 2) %>%
+    filter(., n_quizzes >= min_quizzes) %>%
       summarise(overall_rank = mean(weighted_scaled_score)) %>%
       mutate(overall_rank = rank(-overall_rank, ties.method = "max"))
   ) %>%
@@ -225,3 +231,23 @@ clean_data %>%
   time_trend_x +
   theme_minimal()
 ```
+
+## Team corrolation plot
+
+Correlation plot showing how often people are on the same team. Dark orange is always on the same team (couples), dark purple is rarely / never on the same team. Ideally it would all be white(ish), except for couples.
+
+This excludes people with fewer than `r min_quizzes` recorded.
+
+```{r corr_plot}
+clean_data %>%
+  filter(n_quizzes >= 5) %>%
+  pivot_wider(
+    id_cols = quiz_date,
+    names_from = person,
+    values_from = team_number
+  ) %>%
+  select(-quiz_date) %>%
+  correlate() %>%
+  rearrange() %>%
+  shave() %>%
+  rplot(colors = c("#998ec3", "white", "#f1a340"))
