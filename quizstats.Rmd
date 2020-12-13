@@ -93,7 +93,7 @@ clean_data <- quiz_data %>%
   group_by(quiz_date) %>%
   mutate(team_number = row_number()) %>%
   ungroup() %>%
-  # Resturucture and tidy up the text
+  # Restructure and tidy up the text
   unnest_tokens(
     output = "person",
     input = "team_members"
@@ -119,11 +119,13 @@ clean_data <- quiz_data %>%
     as.integer() %>%
     scale(center = FALSE)) %>%
   # Scaled score inversely weighted by the size of the team
-    # Also a cummulative mean of the weighted score
-  mutate(team_weighted_score = scaled_score * max(team_size) / team_size,
-         time_weighted_score = team_weighted_score * time_weighting,
-         score_cummean = cummean(team_weighted_score),
-    time_weighted_score_cummean = cummean(time_weighted_score)) %>%
+  # Also a cumulative mean of the weighted score
+  mutate(
+    team_weighted_score = scaled_score * max(team_size) / team_size,
+    time_weighted_score = team_weighted_score * time_weighting,
+    score_cummean = cummean(team_weighted_score),
+    time_weighted_score_cummean = cummean(time_weighted_score)
+  ) %>%
   # Count quizzes per person
   group_by(person) %>%
   mutate(n_quizzes = n()) %>%
@@ -133,10 +135,14 @@ clean_data <- quiz_data %>%
   ) %>%
   left_join(
     filter(., n_quizzes >= min_quizzes) %>%
-      summarise(overall_rank = mean(team_weighted_score),
-                time_weighted_rank = mean(time_weighted_score)) %>%
-      mutate(overall_rank = rank(-overall_rank, ties.method = "max"),
-             time_weighted_rank = rank(-time_weighted_rank, ties.method = "max"))
+      summarise(
+        overall_rank = mean(team_weighted_score),
+        time_weighted_rank = mean(time_weighted_score)
+      ) %>%
+      mutate(
+        overall_rank = rank(-overall_rank, ties.method = "max"),
+        time_weighted_rank = rank(-time_weighted_rank, ties.method = "max")
+      )
   ) %>%
   ungroup()
 ```
@@ -201,11 +207,12 @@ clean_data %>%
     locations = cells_column_labels(
       columns = vars("Mean score (overall)", "Mean score (time-weighted)")
     )
-  ) %>% 
-  fmt_number(columns = vars("Mean score (overall)", 
-                            "Mean score (time-weighted)", 
-                            "Last quiz score")
-             )
+  ) %>%
+  fmt_number(columns = vars(
+    "Mean score (overall)",
+    "Mean score (time-weighted)",
+    "Last quiz score"
+  ))
 ```
 
 ## Plots
