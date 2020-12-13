@@ -64,14 +64,23 @@ quiz_data <-
 
 ```{r data_clean, include=FALSE}
 # Set some vars for use with formatting the positions
-position_order <- c("winning_team", "second_place", "third_place", "fourth_place")
+position_order <- c(
+  "winning_team",
+  "second_place",
+  "third_place",
+  "fourth_place"
+)
 position_label <- c("1st", "2nd", "3rd", "4th")
 
 min_quizzes <- 5
 
 clean_data <- quiz_data %>%
   rename(quiz_date = hosted_quiz) %>%
-  mutate(quiz_date = as.Date(quiz_date)) %>%
+  mutate(
+    quiz_date = as.Date(quiz_date),
+    quiz_number = row_number(),
+    time_weighting = (log(quiz_number) + 1) %>% scale(center = FALSE)
+  ) %>%
   # Restructure to make it easier to work with
   pivot_longer(
     cols = c(winning_team, second_place, third_place, fourth_place),
@@ -80,6 +89,10 @@ clean_data <- quiz_data %>%
   ) %>%
   # Drop missing data
   drop_na() %>%
+  separate_rows(team_members, sep = "-") %>%
+  group_by(quiz_date) %>%
+  mutate(team_number = row_number()) %>%
+  ungroup() %>%
   # Resturucture and tidy up the text
   unnest_tokens(
     output = "person",
@@ -98,32 +111,38 @@ clean_data <- quiz_data %>%
   # Create a nicely ordered factor
   mutate(position = ordered(position, position_order, position_label)) %>%
   # Calculate scaled scores
-  group_by(quiz_date, position) %>%
+  group_by(quiz_date, team_number) %>%
   mutate(team_size = n()) %>%
   group_by(quiz_date) %>%
   # Score scaled according to the number of teams
   mutate(scaled_score = fct_rev(position) %>%
     as.integer() %>%
-    scale(center = 0)) %>%
+    scale(center = FALSE)) %>%
   # Scaled score inversely weighted by the size of the team
-  mutate(weighted_scaled_score = scaled_score * (1 - team_size / n())) %>%
+    # Also a cummulative mean of the weighted score
+  mutate(team_weighted_score = scaled_score * max(team_size) / team_size,
+         time_weighted_score = team_weighted_score * time_weighting,
+         score_cummean = cummean(team_weighted_score),
+    time_weighted_score_cummean = cummean(time_weighted_score)) %>%
   # Count quizzes per person
   group_by(person) %>%
   mutate(n_quizzes = n()) %>%
-  # Also a cummulative mean of the weighted score
-  mutate(score_cummean = cummean(weighted_scaled_score)) %>%
   left_join(
     summarise(., n_quizzes = max(n_quizzes)) %>%
       mutate(n_quizzes_rank = rank(-n_quizzes, ties.method = "min"))
   ) %>%
   left_join(
     filter(., n_quizzes >= min_quizzes) %>%
-      summarise(overall_rank = mean(weighted_scaled_score)) %>%
-      mutate(overall_rank = rank(-overall_rank, ties.method = "max"))
+      summarise(overall_rank = mean(team_weighted_score),
+                time_weighted_rank = mean(time_weighted_score)) %>%
+      mutate(overall_rank = rank(-overall_rank, ties.method = "max"),
+             time_weighted_rank = rank(-time_weighted_rank, ties.method = "max"))
   ) %>%
   ungroup()
 ```
 
+
+## Hosting Summary
 ```{r host_table}
 quiz_data %>%
   select(quizmasters, hosted_quiz, winning_team) %>%
@@ -132,47 +151,77 @@ quiz_data %>%
   summarise(
     n_hosted = n(),
     last_hosted = time_length(interval(max(hosted_quiz), today()), "weeks")
-  ) %>% 
-  arrange(-n_hosted, last_hosted) %>% 
+  ) %>%
+  arrange(-n_hosted, last_hosted) %>%
   mutate(last_hosted = if_else(last_hosted < 1,
-                               str_glue("{ceiling(last_hosted)} week ago"),
-                               str_glue("{ceiling(last_hosted)} weeks ago"))) %>% 
-  rename("Quiz Hosts" = quizmasters,
-         "Times hosted" = n_hosted,
-         "Last hosted" = last_hosted) %>% 
+    str_glue("{ceiling(last_hosted)} week ago"),
+    str_glue("{ceiling(last_hosted)} weeks ago")
+  )) %>%
+  rename(
+    "Quiz Hosts" = quizmasters,
+    "Times hosted" = n_hosted,
+    "Last hosted" = last_hosted
+  ) %>%
   gt()
 ```
+
+
+## Score summary
+Rank is only calculated for people who have at least `r min_quizzes` recorded.
+Time weighted rank gives more importance to more recent quizzes (`ln(<quiz number>) + 1`)
 
 ```{r summary_table}
 clean_data %>%
   group_by(person) %>%
-  summarise(across(c(overall_rank, n_quizzes, score_cummean), last)) %>%
-  arrange(overall_rank) %>%
+  summarise(across(
+    c(
+      time_weighted_rank,
+      time_weighted_score_cummean,
+      overall_rank,
+      score_cummean,
+      n_quizzes,
+      time_weighted_score
+    ),
+    last
+  )) %>%
+  arrange(time_weighted_rank) %>%
   rename(
     Name = person,
-    "Current rank" = overall_rank,
+    "Time-weighted Rank" = time_weighted_rank,
+    "Mean score (time-weighted)" = time_weighted_score_cummean,
+    "Overall Rank" = overall_rank,
+    "Mean score (overall)" = score_cummean,
     "Number of quizzes" = n_quizzes,
-    "Mean score" = score_cummean
+    "Last quiz score" = time_weighted_score
   ) %>%
   gt() %>%
   tab_footnote(
-    footnote = "Score is the score per quiz (1st, 2nd etc.), scaled and then weighted by the team size",
+    footnote = "Score is the score per quiz (1st, 2nd etc.),
+    scaled and then weighted by the team size",
     locations = cells_column_labels(
-      columns = vars("Mean score")
+      columns = vars("Mean score (overall)", "Mean score (time-weighted)")
     )
-  )
+  ) %>% 
+  fmt_number(columns = vars("Mean score (overall)", 
+                            "Mean score (time-weighted)", 
+                            "Last quiz score")
+             )
 ```
+
+## Plots
+
+### Position plot
 
 ```{r bar_plot_n}
 # Plot of People by number of times they have placed.
 clean_data %>%
-  ggplot(aes(x = reorder(person, overall_rank), fill = position)) +
+  ggplot(aes(x = reorder(person, time_weighted_rank), fill = position)) +
   geom_bar() +
   xlab("Person") +
   ylab("Number of quizes") +
   ggtitle(
     label = "Count of positions per person",
-    subtitle = "Sorted by overall rank"
+    subtitle = "Sorted by time-weighted rank"
   ) +
   scale_fill_brewer("Team Position",
     type = "seq",
@@ -182,6 +231,7 @@ clean_data %>%
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45))
 ```
+
 
 ```{r plot_formatting}
 
@@ -197,40 +247,72 @@ time_trend_x <-
   )
 ```
 
-```{r scaled_score_over_time_n_quizzes}
+### Weighted score over time
+
+#### People who have been in the most quizzes
+
+```{r score_over_time_n_quizzes}
 # Scaled score over time
 clean_data %>%
   filter(n_quizzes_rank <= 10) %>%
-  ggplot(aes(x = quiz_date, y = score_cummean, colour = reorder(person, overall_rank))) +
+  ggplot(aes(
+    x = quiz_date, y = time_weighted_score,
+    colour = reorder(person, time_weighted_rank)
+  )) +
   geom_smooth(se = FALSE, size = 0.5) +
   xlab("Date of quiz") +
   ylab("Weighted score") +
   ggtitle(
-    label = "Weighted score over time",
-    subtitle = "Filtered to the 10 people who have done the most quizzes"
+    label = "Actual time-weighted score over time",
+    subtitle = "Filtered to the 10 people who have the most quizzes recorded"
   ) +
   colour_scale +
   time_trend_x +
   theme_minimal()
 ```
 
+#### People with the highest current mean score (rank)
 
-```{r scaled_score_over_time_rank}
+```{r score_over_time_rank}
 # Scaled score over time
 clean_data %>%
   filter(overall_rank <= 10) %>%
-  ggplot(aes(x = quiz_date, y = score_cummean, colour = reorder(person, overall_rank))) +
+  ggplot(aes(
+    x = quiz_date, y = time_weighted_score,
+    colour = reorder(person, time_weighted_rank)
+  )) +
   geom_smooth(se = FALSE, size = 0.5) +
   xlab("Date of quiz") +
   ylab("Weighted score") +
   ggtitle(
-    label = "Weighted score over time",
-    subtitle = "Filtered to the top 10 overall ranked people"
+    label = "Actual time-weighted score over time",
+    subtitle = "Filtered to the top 10 (time-weighted) ranked people"
   ) +
   colour_scale +
   time_trend_x +
   theme_minimal()
 ```
+
+```{r mean_score_over_time_rank}
+# Scaled score over time
+clean_data %>%
+  filter(overall_rank <= 10) %>%
+  ggplot(aes(
+    x = quiz_date, y = time_weighted_score_cummean,
+    colour = reorder(person, time_weighted_rank)
+  )) +
+  geom_smooth(se = FALSE, size = 0.5) +
+  xlab("Date of quiz") +
+  ylab("Weighted score") +
+  ggtitle(
+    label = "Cummulative mean time-weighted score over time",
+    subtitle = "Filtered to the top 10 (time-weighted) ranked people"
+  ) +
+  colour_scale +
+  time_trend_x +
+  theme_minimal()
+```
+
 
 ## Team corrolation plot
 
@@ -251,3 +333,4 @@ clean_data %>%
   rearrange() %>%
   shave() %>%
   rplot(colors = c("#998ec3", "white", "#f1a340"))
+```
