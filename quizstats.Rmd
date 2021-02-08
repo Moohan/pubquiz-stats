@@ -106,6 +106,7 @@ clean_data <- quiz_data %>%
   mutate(
     person = case_when(
       person == "cami" ~ "camille",
+      person == "jonathan" ~ "jonty",
       TRUE ~ person
     ),
     # Re-capitalise
