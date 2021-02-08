@@ -148,7 +148,17 @@ clean_data <- quiz_data %>%
         time_weighted_rank = rank(-time_weighted_rank, ties.method = "max")
       )
   ) %>%
-  ungroup()
+  filter(!(person %in% c("Calum", "Rory", "Jonty", "Ben", "Ian", "Joel"))) %>%
+  ungroup() %>%
+  mutate(person = case_when(
+    person == "Sarah" ~ "Sarah & Calum",
+    person == "Viv" ~ "Viv & Rory",
+    person == "Julia" ~ "Julia & Jonty",
+    person == "Cathy" ~ "Cathy & Ben",
+    person == "Kirsty" ~ "Kirsty & Ian",
+    person == "Sam" ~ "Sam & Joel",
+    TRUE ~ person
+  ))
 ```
 
 
