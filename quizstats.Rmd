@@ -62,6 +62,8 @@ quiz_data <-
   clean_names()
 ```
 
+Report ran `r today()`.
+
 ```{r data_clean, include=FALSE}
 # Set some vars for use with formatting the positions
 position_order <- c(
