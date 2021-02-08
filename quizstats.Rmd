@@ -265,7 +265,9 @@ colour_scale <- scale_colour_brewer("Person",
   palette = "Set3"
 )
 
-colour_scale <- scale_color_manual("Person", values = ggsci::pal_simpsons()(n_to_plot))
+colour_scale <- scale_color_manual("Person",
+  values = ggsci::pal_simpsons()(n_to_plot)
+)
 
 library(randomcoloR)
 n <- 13
@@ -352,7 +354,7 @@ This excludes people with fewer than `r min_quizzes` recorded.
 
 clean_data %>%
   filter(n_quizzes >= min_quizzes) %>%
-  arrange(person) %>% 
+  arrange(person) %>%
   pivot_wider(
     id_cols = quiz_date,
     names_from = person,
@@ -363,5 +365,5 @@ clean_data %>%
   rearrange() %>%
   shave() %>%
   rplot(colors = c("#998ec3", "white", "#f1a340")) +
-  scale_x_discrete(guide = guide_axis(n.dodge=2))
+  scale_x_discrete(guide = guide_axis(n.dodge = 2))
 ```
