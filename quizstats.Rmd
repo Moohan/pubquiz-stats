@@ -74,7 +74,8 @@ position_order <- c(
 )
 position_label <- c("1st", "2nd", "3rd", "4th")
 
-min_quizzes <- 5
+min_quizzes <- 8
+n_to_plot <- 12
 
 clean_data <- quiz_data %>%
   rename(quiz_date = hosted_quiz) %>%
