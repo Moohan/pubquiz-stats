@@ -187,10 +187,9 @@ quiz_data %>%
   gt()
 ```
 
-
 ## Score summary
-Rank is only calculated for people who have at least `r min_quizzes` recorded.
-Time weighted rank gives more importance to more recent quizzes (weighted linearly)
+
+Rank is only calculated for people who have at least `r min_quizzes` recorded. Time weighted rank gives more importance to more recent quizzes (weighted linearly)
 
 ```{r summary_table}
 clean_data %>%
@@ -257,7 +256,6 @@ clean_data %>%
   theme(axis.text.x = element_text(angle = 45))
 ```
 
-
 ```{r plot_formatting}
 
 colour_scale <- scale_colour_brewer("Person",
@@ -298,11 +296,12 @@ clean_data %>%
   ) +
   colour_scale +
   time_trend_x +
-  theme_minimal()
+  theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45))
 ```
 
-
 ### Mean score over time
+
 ```{r mean_time_score_over_time}
 # Scaled score over time
 clean_data %>%
@@ -319,9 +318,9 @@ clean_data %>%
   ) +
   colour_scale +
   time_trend_x +
-  theme_minimal()
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45))
 ```
-
 
 ### Un-weighted score over time
 
@@ -341,7 +340,8 @@ clean_data %>%
   ) +
   colour_scale +
   time_trend_x +
-  theme_minimal()
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45))
 ```
 
 ## Team corrolation plot
