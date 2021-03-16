@@ -151,7 +151,7 @@ clean_data <- quiz_data %>%
         time_weighted_rank = rank(-time_weighted_rank, ties.method = "min")
       )
   ) %>%
-  filter(!(person %in% c("Calum", "Rory", "Jonty", "Ben", "Ian", "Joel"))) %>%
+  filter(!(person %in% c("Calum", "Rory", "Jonty", "Ben", "Ian"))) %>%
   ungroup() %>%
   mutate(person = case_when(
     person == "Sarah" ~ "Sarah & Calum",
@@ -159,13 +159,12 @@ clean_data <- quiz_data %>%
     person == "Julia" ~ "Julia & Jonty",
     person == "Cathy" ~ "Cathy & Ben",
     person == "Kirsty" ~ "Kirsty & Ian",
-    person == "Sam" ~ "Sam & Joel",
     TRUE ~ person
   ))
 ```
 
-
 ## Hosting Summary
+
 ```{r host_table}
 quiz_data %>%
   select(quizmasters, hosted_quiz, winning_team) %>%
