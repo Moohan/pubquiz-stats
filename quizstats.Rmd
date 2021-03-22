@@ -232,9 +232,12 @@ quiz_data %>%
   gt()
 ```
 
+
+
 ## Score summary
 <!-- TODO: Update this to deal with multiple people. -->
 `r str_glue("{people_on_streak} is on a streak of {max_streak} wins {emo::ji('party')}")`
+
 
 Rank is only calculated for people who have at least `r min_quizzes` recorded. Time weighted rank gives more importance to more recent quizzes (weighted linearly)
 
@@ -279,9 +282,7 @@ clean_data %>%
   ))
 ```
 
-## Plots
-
-### Position plot
+## Position plot
 
 ```{r bar_plot_n}
 # Plot of People by number of times they have placed.
@@ -302,6 +303,32 @@ clean_data %>%
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45))
 ```
+
+## Team corrolation plot
+
+Correlation plot showing how often people are on the same team. Dark orange is always on the same team (couples), dark purple is rarely / never on the same team. Ideally it would all be white(ish), except for couples.
+
+This excludes people with fewer than `r min_quizzes` recorded.
+
+```{r corr_plot}
+
+clean_data %>%
+  filter(n_quizzes >= min_quizzes) %>%
+  arrange(person) %>%
+  pivot_wider(
+    id_cols = quiz_date,
+    names_from = person,
+    values_from = team_number
+  ) %>%
+  select(-quiz_date) %>%
+  correlate() %>%
+  rearrange() %>%
+  shave() %>%
+  rplot(colors = c("#998ec3", "white", "#f1a340")) +
+  scale_x_discrete(guide = guide_axis(n.dodge = 2))
+```
+
+## Time trends
 
 ```{r plot_formatting}
 
@@ -346,7 +373,7 @@ clean_data %>%
   colour_scale +
   time_trend_x +
   theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45))
+  theme(axis.text.x = element_text(angle = 45))
 ```
 
 ### Mean score over time
@@ -382,7 +409,8 @@ clean_data %>%
     colour = reorder(person, overall_rank),
     shape = reorder(person, overall_rank)
   )) +
-  geom_smooth(se = FALSE, size = 0.5) +
+  geom_line(size = 0.1, linetype = "dotted", lineend = "round") +
+  geom_point() +
   xlab("Date of quiz") +
   ylab("Weighted score") +
   ggtitle(
@@ -394,27 +422,26 @@ clean_data %>%
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45))
 ```
+### Positions over time
 
-## Team corrolation plot
 
-Correlation plot showing how often people are on the same team. Dark orange is always on the same team (couples), dark purple is rarely / never on the same team. Ideally it would all be white(ish), except for couples.
-
-This excludes people with fewer than `r min_quizzes` recorded.
-
-```{r corr_plot}
-
+```{r position_over_time}
 clean_data %>%
-  filter(n_quizzes >= min_quizzes) %>%
-  arrange(person) %>%
-  pivot_wider(
-    id_cols = quiz_date,
-    names_from = person,
-    values_from = team_number
-  ) %>%
-  select(-quiz_date) %>%
-  correlate() %>%
-  rearrange() %>%
-  shave() %>%
-  rplot(colors = c("#998ec3", "white", "#f1a340")) +
-  scale_x_discrete(guide = guide_axis(n.dodge = 2))
+  filter(n_quizzes_rank <= n_to_plot) %>%
+  ggplot(aes(
+    x = quiz_date, y = fct_rev(position),
+    colour = reorder(person, overall_rank),
+    shape = reorder(person, overall_rank)
+  )) +
+  geom_jitter(width = 0, height = 0.25) +
+  xlab("Date of quiz") +
+  ylab("Team position") +
+  ggtitle(
+    label = "Positions over time"
+  ) +
+  colour_scale +
+  shape_scale +
+  time_trend_x +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45))
 ```
