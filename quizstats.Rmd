@@ -62,7 +62,7 @@ quiz_data <-
   clean_names()
 ```
 
-Report ran `r today()`.
+Report ran `r stamp("Monday 1 January 2020")(today())`.
 
 ```{r data_clean, include=FALSE}
 # Set some vars for use with formatting the positions
@@ -161,9 +161,22 @@ clean_data <- quiz_data %>%
     person == "Kirsty" ~ "Kirsty & Ian",
     TRUE ~ person
   ))
+
+last_winning_team <- clean_data %>%
+  filter(quiz_number == max(quiz_number), position == "1st")
+
+pretty_last_winning_team <- last_winning_team %>%
+  unnest_tokens(input = "person", output = "person") %>%
+  pull(person) %>%
+  str_to_sentence() %>%
+  str_sort() %>%
+  str_flatten(", ") %>%
+  str_replace(", (\\w+?)$", " and \\1")
 ```
 
 ## Hosting Summary
+
+There have been `r max(clean_data$quiz_number)` quizzes recorded since  the first (`r stamp("1 Jan 2020")(min(clean_data$quiz_date))`). The most recent recorded quiz was on `r stamp("Monday 1 January 2020")(last(clean_data$quiz_date))`, it was hosted by `r last(clean_data$quizmasters)` and the winning team was: `r pretty_last_winning_team`.
 
 ```{r host_table}
 quiz_data %>%
