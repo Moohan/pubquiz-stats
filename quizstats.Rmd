@@ -51,20 +51,12 @@ if (!require(googlesheets4)) {
 ```
 
 ```{r data_import, include=FALSE}
-sheet_url <- "https://docs.google.com/spreadsheets/d/12yUhkqq5ajM_uq7vLytH9cBceCCDFC0MEJluVX_aBdA/edit?usp=sharing"
-
-# Sheet doesn't need auth as it has link editing enabled
-gs4_deauth()
-
-# Read the sheet and clean up the variable names
-quiz_data <-
-  read_sheet(sheet_url) %>%
-  clean_names()
+source("code/import_data.R")
 ```
 
 Report ran `r stamp("Monday 1 January 2020")(today())`.
 
-```{r data_clean, include=FALSE}
+```{r clean_data, include=FALSE}
 # Set some vars for use with formatting the positions
 position_order <- c(
   "winning_team",
@@ -72,87 +64,18 @@ position_order <- c(
   "third_place",
   "fourth_place"
 )
+
 position_label <- c("1st", "2nd", "3rd", "4th")
 
 min_quizzes <- 8
 n_to_plot <- 14
 
-clean_data <- quiz_data %>%
-  rename(quiz_date = hosted_quiz) %>%
-  mutate(
-    quiz_date = as.Date(quiz_date),
-    quiz_number = row_number(),
-    time_weighting = (quiz_number * 2) %>% scale(center = FALSE)
-  ) %>%
-  # Restructure to make it easier to work with
-  pivot_longer(
-    cols = c(winning_team, second_place, third_place, fourth_place),
-    names_to = "position",
-    values_to = "team_members"
-  ) %>%
-  # Drop missing data
-  drop_na() %>%
-  separate_rows(team_members, sep = "-") %>%
-  group_by(quiz_date) %>%
-  mutate(team_number = row_number()) %>%
-  ungroup() %>%
-  # Restructure and tidy up the text
-  unnest_tokens(
-    output = "person",
-    input = "team_members"
-  ) %>%
-  anti_join(get_stopwords(), by = c("person" = "word")) %>%
-  # Fixes for names
-  mutate(
-    person = case_when(
-      person == "cami" ~ "camille",
-      person == "jonathan" ~ "jonty",
-      person == "spud" ~ "emma",
-      TRUE ~ person
-    ),
-    # Re-capitalise
-    person = str_to_sentence(person)
-  ) %>%
-  # Create a nicely ordered factor
-  mutate(position = ordered(position, position_order, position_label)) %>%
-  # Calculate scaled scores
-  group_by(quiz_date, team_number) %>%
-  mutate(team_size = n()) %>%
-  group_by(quiz_date) %>%
-  # Score scaled according to the number of teams
-  mutate(scaled_score = fct_rev(position) %>%
-    as.integer() %>%
-    scale(center = FALSE)) %>%
-  # Scaled score inversely weighted by the size of the team
-  # Also a cumulative mean of the weighted score
-  mutate(
-    team_weighted_score = scaled_score * max(team_size) / team_size,
-    time_weighted_score = team_weighted_score * time_weighting
-  ) %>%
-  # Count quizzes per person
-  group_by(person) %>%
-  mutate(
-    score_cummean = cummean(team_weighted_score),
-    time_weighted_score_cummean = cummean(time_weighted_score),
-    n_quizzes = n()
-  ) %>%
-  left_join(
-    summarise(., n_quizzes = max(n_quizzes)) %>%
-      mutate(n_quizzes_rank = rank(-n_quizzes, ties.method = "min"))
-  ) %>%
-  left_join(
-    filter(., n_quizzes >= min_quizzes) %>%
-      summarise(
-        overall_rank = last(score_cummean),
-        time_weighted_rank = last(time_weighted_score_cummean)
-      ) %>%
-      mutate(
-        overall_rank = rank(-overall_rank, ties.method = "min"),
-        time_weighted_rank = rank(-time_weighted_rank, ties.method = "min")
-      )
-  ) %>%
+source("code/clean_data.R")
+
+# Combine couples who have always been together
+clean_data <- clean_data %>% 
   filter(!(person %in% c("Calum", "Rory", "Jonty", "Ben", "Ian"))) %>%
-  ungroup() %>%
+  ungroup() %>% 
   mutate(person = case_when(
     person == "Sarah" ~ "Sarah & Calum",
     person == "Viv" ~ "Viv & Rory",
@@ -173,37 +96,7 @@ pretty_last_winning_team <- last_winning_team %>%
   str_flatten(", ") %>%
   str_replace(", (\\w+?)$", " and \\1")
 
-winning_streak <- function(name) {
-  person_scores <- clean_data %>%
-    filter(
-      person == name,
-      !str_detect(quizmasters, name)
-    ) %>%
-    select(quizmasters, quiz_number, person, position) %>%
-    arrange(desc(quiz_number)) %>%
-    pull(position)
-
-  streak_ended <- FALSE
-  streak <- 0L
-  while (!streak_ended) {
-    if (person_scores[streak + 1L] == "1st") {
-      streak <- streak + 1L
-    } else {
-      streak_ended <- TRUE
-    }
-  }
-  return(streak)
-}
-last_winning_team_streaks <- map_int(last_winning_team$person, winning_streak)
-
-max_streak <- max(last_winning_team_streaks)
-
-people_on_streak <- last_winning_team$person[which(last_winning_team_streaks == max_streak)] %>%
-  as_tibble() %>%
-  unnest_tokens(input = "value", output = "person") %>%
-  pull(person) %>%
-  str_to_sentence() %>%
-  str_sort()
+source("code/compute_streaks.R")
 ```
 
 ## Hosting Summary
@@ -211,25 +104,9 @@ people_on_streak <- last_winning_team$person[which(last_winning_team_streaks == 
 There have been `r max(clean_data$quiz_number)` quizzes recorded since  the first (`r stamp("1 Jan 2020")(min(clean_data$quiz_date))`). The most recent recorded quiz was on `r stamp("Monday 1 January 2020")(last(clean_data$quiz_date))`, it was hosted by `r last(clean_data$quizmasters)` and the winning team was: `r pretty_last_winning_team`.
 
 ```{r host_table}
-quiz_data %>%
-  select(quizmasters, hosted_quiz, winning_team) %>%
-  drop_na() %>%
-  group_by(quizmasters) %>%
-  summarise(
-    n_hosted = n(),
-    last_hosted = time_length(interval(max(hosted_quiz), today()), "weeks")
-  ) %>%
-  arrange(-n_hosted, last_hosted) %>%
-  mutate(last_hosted = if_else(last_hosted == 1,
-    str_glue("{ceiling(last_hosted)} week ago"),
-    str_glue("{ceiling(last_hosted)} weeks ago")
-  )) %>%
-  rename(
-    "Quiz Hosts" = quizmasters,
-    "Times hosted" = n_hosted,
-    "Last hosted" = last_hosted
-  ) %>%
-  gt()
+source("code/create_host_table.R")
+
+hosted_table
 ```
 
 
