@@ -318,6 +318,8 @@ library(randomcoloR)
 n <- 13
 palette <- scale_colour_manual(values = distinctColorPalette(n))
 
+shape_scale <- scale_shape_manual("Person", values = rep(c(15, 16, 17), n_to_plot)[1:n_to_plot])
+
 time_trend_x <-
   scale_x_date(
     breaks = breaks_width("week", offset = -1),
@@ -377,7 +379,8 @@ clean_data %>%
   filter(n_quizzes_rank <= n_to_plot) %>%
   ggplot(aes(
     x = quiz_date, y = team_weighted_score,
-    colour = reorder(person, overall_rank)
+    colour = reorder(person, overall_rank),
+    shape = reorder(person, overall_rank)
   )) +
   geom_smooth(se = FALSE, size = 0.5) +
   xlab("Date of quiz") +
@@ -386,6 +389,7 @@ clean_data %>%
     label = "Actual un-weighted score over time"
   ) +
   colour_scale +
+  shape_scale +
   time_trend_x +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45))
