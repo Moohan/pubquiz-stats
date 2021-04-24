@@ -24,16 +24,7 @@ clean_data <- quiz_data %>%
   ) %>%
   anti_join(get_stopwords(), by = c("person" = "word")) %>%
   # Fixes for names
-  mutate(
-    person = case_when(
-      person == "cami" ~ "camille",
-      person == "jonathan" ~ "jonty",
-      person == "spud" ~ "emma",
-      TRUE ~ person
-    ),
-    # Re-capitalise
-    person = str_to_sentence(person)
-  ) %>%
+  regularise_names(person) %>%
   # Create a nicely ordered factor
   mutate(position = ordered(position, position_order, position_label)) %>%
   # Calculate scaled scores
