@@ -3,7 +3,7 @@ clean_data <- quiz_data %>%
   mutate(
     quiz_date = as.Date(quiz_date),
     quiz_number = row_number(),
-    time_weighting = (quiz_number * 2) %>% scale(center = FALSE)
+    time_weighting = (quiz_number * 2.5) %>% scale(center = FALSE)
   ) %>%
   # Restructure to make it easier to work with
   pivot_longer(
