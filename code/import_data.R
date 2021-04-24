@@ -5,11 +5,11 @@ sheet_id <- "12yUhkqq5ajM_uq7vLytH9cBceCCDFC0MEJluVX_aBdA"
 quiz_data <-
   read_sheet(
     ss = sheet_id, sheet = "Data",
-    .name_repair = make_clean_names
+    .name_repair = make_clean_names,
+    col_types = "cDcccc"
   )
 
 quiz_data_fixed_names <- quiz_data %>%
-  clean_names() %>%
   regularise_names(quizmasters) %>%
   regularise_names(winning_team) %>%
   regularise_names(second_place) %>%
@@ -30,7 +30,13 @@ if (all(quiz_data == quiz_data_fixed_names | (is.na(quiz_data) & is.na(quiz_data
         nrow(quiz_data_fixed_names) + 1,
         ncol(quiz_data_fixed_names)
       )
-    ), col_names = FALSE
+    ),
+    col_names = FALSE,
+    reformat = FALSE
+  )
+  range_autofit(
+    ss = sheet_id,
+    sheet = "Data"
   )
   quiz_data <- clean_names(quiz_data_fixed_names)
 }
