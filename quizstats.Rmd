@@ -11,6 +11,7 @@ knitr::opts_chunk$set(
   fig.width = 10
 )
 
+# Load packages
 library(dplyr)
 library(tidyr)
 library(stringr)
@@ -27,6 +28,9 @@ library(gt)
 library(corrr)
 library(googlesheets4)
 library(emo)
+
+# Load functions
+walk(list.files("code/functions/", pattern = ".R", full.names = TRUE), source)
 ```
 
 ```{r data_import, include=FALSE}
